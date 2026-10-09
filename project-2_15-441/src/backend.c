@@ -34,7 +34,7 @@
 
 // Set to 0 to silence debug output. Output goes to stderr and is appended to
 // DEBUG_LOG so it survives after the test kills the tmux session.
-#define DEBUG 1
+#define DEBUG 0
 #define DEBUG_LOG "/tmp/cmu_tcp_debug.log"
 
 static FILE* debug_log_file(void) {
@@ -120,10 +120,13 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
       flags, get_seq(hdr), get_ack(hdr), get_hlen(hdr), get_plen(hdr),
       get_dst(hdr), sock->my_port, sock->is_connected, sock->syn_rcvd);
 
-  if (get_dst(hdr) != sock->my_port) {  // wrong port
-    DEBUG_PRINT("dropped: wrong port\n");
+  if (ntohl(hdr->identifier) != IDENTIFIER){
     return;
   }
+  //if (get_dst(hdr) != sock->my_port) {  // wrong port
+  //  DEBUG_PRINT("dropped: wrong port\n");
+  //  return;
+  //}
 
   switch (flags) {
     case SYN_FLAG_MASK: {
