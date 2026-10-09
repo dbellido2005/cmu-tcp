@@ -128,7 +128,7 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
   switch (flags) {
     case SYN_FLAG_MASK: {
       bool well_formed =
-          ((get_plen(hdr) == get_hlen(hdr)) & (sock->type == TCP_LISTENER));
+          ((get_plen(hdr) == get_hlen(hdr)) && (sock->type == TCP_LISTENER));
       DEBUG_PRINT("SYN well_formed=%d\n", well_formed);
       if (well_formed) {
         sock->syn_rcvd = true;
@@ -137,8 +137,8 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
       break;
     }
     case (SYN_FLAG_MASK | ACK_FLAG_MASK): {
-      bool well_formed = (sock->type == TCP_INITIATOR) &
-                         (sock->window.last_ack_received + 1 == get_ack(hdr)) &
+      bool well_formed = (sock->type == TCP_INITIATOR) &&
+                         (sock->window.last_ack_received + 1 == get_ack(hdr)) &&
                          (get_plen(hdr) == get_hlen(hdr));
       DEBUG_PRINT("SYN-ACK well_formed=%d (expected ack=%u)\n", well_formed,
                   sock->window.last_ack_received + 1);
@@ -158,8 +158,8 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
       uint32_t ack = get_ack(hdr);
 
       if (!sock->is_connected) {  // HANDSHAKE
-        bool well_formed = (sock->type == TCP_LISTENER) &
-                           (get_ack(hdr) == sock->isn + 1) &
+        bool well_formed = (sock->type == TCP_LISTENER) &&
+                           (get_ack(hdr) == sock->isn + 1) &&
                            (get_plen(hdr) == get_hlen(hdr));
         DEBUG_PRINT("handshake ACK well_formed=%d (expected ack=%u)\n",
                     well_formed, sock->isn + 1);
@@ -177,7 +177,7 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
       }
     }
     default: {
-      if (sock->is_connected) {
+      if (sock->is_connected && (get_plen(hdr)>get_hlen(hdr))) {
         socklen_t conn_len = sizeof(sock->conn);
         uint32_t seq = sock->window.last_ack_received;
 
