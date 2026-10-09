@@ -14,6 +14,7 @@
 #ifndef PROJECT_2_15_441_INC_CMU_TCP_H_
 #define PROJECT_2_15_441_INC_CMU_TCP_H_
 
+#include <stdbool.h>
 #include <netinet/in.h>
 #include <pthread.h>
 #include <stdint.h>
@@ -46,6 +47,9 @@ typedef enum {
  */
 typedef struct {
   int socket;
+  bool is_connected;
+  bool syn_rcvd;
+  uint32_t isn;
   pthread_t thread_id;
   uint16_t my_port;
   struct sockaddr_in conn;
