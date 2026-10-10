@@ -120,13 +120,9 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
       flags, get_seq(hdr), get_ack(hdr), get_hlen(hdr), get_plen(hdr),
       get_dst(hdr), sock->my_port, sock->is_connected, sock->syn_rcvd);
 
-  if (ntohl(hdr->identifier) != IDENTIFIER){
+  if (ntohl(hdr->identifier) != IDENTIFIER) {
     return;
   }
-  //if (get_dst(hdr) != sock->my_port) {  // wrong port
-  //  DEBUG_PRINT("dropped: wrong port\n");
-  //  return;
-  //}
 
   switch (flags) {
     case SYN_FLAG_MASK: {
@@ -152,8 +148,7 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
         }
         sock->window.next_seq_expected = get_seq(hdr) + 1;
         sock->is_connected = true;
-        send_flag_packet(ACK_FLAG_MASK, sock, get_seq(hdr) + 1,
-                         get_ack(hdr));
+        send_flag_packet(ACK_FLAG_MASK, sock, get_seq(hdr) + 1, get_ack(hdr));
       }
       break;
     }
@@ -180,7 +175,7 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
       }
     }
     default: {
-      if (sock->is_connected && (get_plen(hdr)>get_hlen(hdr))) {
+      if (sock->is_connected && (get_plen(hdr) > get_hlen(hdr))) {
         socklen_t conn_len = sizeof(sock->conn);
         uint32_t seq = sock->window.last_ack_received;
 
@@ -307,7 +302,7 @@ void single_send(cmu_socket_t* sock, uint8_t* data, int buf_len) {
       uint32_t ack = sock->window.next_seq_expected;
       uint16_t hlen = sizeof(cmu_tcp_header_t);
       uint16_t plen = hlen + payload_len;
-      uint8_t flags = 0;
+      uint8_t flags = ACK_FLAG_MASK;
       uint16_t adv_window = 1;
       uint16_t ext_len = 0;
       uint8_t* ext_data = NULL;
