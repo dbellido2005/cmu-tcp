@@ -68,6 +68,7 @@ typedef struct {
   int socket;
   bool fin_rcvd; // has the other socket received our fin (=acked it back)
   bool fin_other; // has the other socket sent a fin
+  bool handshake_done;
   bool is_connected;
   bool syn_rcvd;
   uint32_t isn;

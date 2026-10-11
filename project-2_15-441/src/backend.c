@@ -209,19 +209,23 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
       break;
     }
     case FIN_FLAG_MASK: {
-      sock->fin_other = true;
-      if (get_plen(hdr) > get_hlen(hdr)) send_payload_ack(sock, pkt, true); // there's payload
-      else send_flag_packet(ACK_FLAG_MASK, sock, get_seq(hdr)+1, get_ack(hdr)); 
-      if (sock->fin_rcvd) sock->is_connected = false;
+      if (sock->handshake_done){
+        sock->fin_other = true;
+        if (get_plen(hdr) > get_hlen(hdr)) send_payload_ack(sock, pkt, true); // there's payload
+        else send_flag_packet(ACK_FLAG_MASK, sock, get_seq(hdr)+1, get_ack(hdr)); 
+        if (sock->fin_rcvd) sock->is_connected = false;
+      }
       break;
     }
     case (FIN_FLAG_MASK | ACK_FLAG_MASK): {
-      sock->fin_other = true;
-      if (get_ack(hdr) == sock->max_byte_sent + 1) sock->fin_rcvd = true;
-      if (get_plen(hdr) > get_hlen(hdr)) send_payload_ack(sock, pkt, true); // there's payload
-      else send_flag_packet(ACK_FLAG_MASK, sock, get_seq(hdr)+1, get_ack(hdr));
-      // unsure about the seq and ack
-      sock->is_connected = false;
+      if (sock->handshake_done){
+        sock->fin_other = true;
+        if (get_ack(hdr) == sock->max_byte_sent + 1) sock->fin_rcvd = true;
+        if (get_plen(hdr) > get_hlen(hdr)) send_payload_ack(sock, pkt, true); // there's payload
+        else send_flag_packet(ACK_FLAG_MASK, sock, get_seq(hdr)+1, get_ack(hdr));
+        // unsure about the seq and ack
+        if (sock->fin_other && sock->fin_rcvd) sock->is_connected = false;
+      }
       break; 
     }
     case ACK_FLAG_MASK: {
@@ -403,6 +407,7 @@ void handshake(cmu_socket_t* sock) {
           TIMEOUT);  // wait for a SYN; handle_message replies with SYN-ACK
     }
   }
+  sock->handshake_done = true;
 }
 
 double get_time_passed(struct timespec start, struct timespec end) {
@@ -558,7 +563,8 @@ void teardown(cmu_socket_t* sock){
 
   // send FIN
   while (!sock->fin_rcvd) {
-    send_flag_packet(FIN_FLAG_MASK, sock, sock->window.next_seq_expected, sock->max_byte_sent);
+    send_flag_packet(FIN_FLAG_MASK | ACK_FLAG_MASK, sock,
+                     sock->window.next_seq_expected, sock->max_byte_sent);
     check_for_data(sock, TIMEOUT);  // waits up to DEFAULT_TIMEOUT (3s)
   }
 
@@ -587,6 +593,7 @@ void* begin_backend(void* in) {
   init_unacked_buffer(sock);
   sock->fin_rcvd = false;
   sock->fin_other = false;
+  sock->handshake_done = false;
 
   handshake(sock);
 
