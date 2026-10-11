@@ -25,8 +25,8 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
-#include <unistd.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "cmu_packet.h"
 #include "cmu_tcp.h"
@@ -170,12 +170,12 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
         if (well_formed) {
           sock->is_connected = true;
           if (after(ack, sock->window.last_ack_received) &&
-            !after(ack, sock->max_byte_sent)) {
+              !after(ack, sock->max_byte_sent)) {
             sock->window.last_ack_received = ack;
           }
         }
         break;
-      } else { // REGULAR
+      } else {  // REGULAR
         if (after(ack, sock->window.last_ack_received) &&
             !after(ack, sock->max_byte_sent)) {
           sock->window.last_ack_received = ack;
@@ -185,7 +185,7 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
     default: {
       if (sock->is_connected && (get_plen(hdr) > get_hlen(hdr))) {
         socklen_t conn_len = sizeof(sock->conn);
-        uint32_t seq = sock->window.last_ack_received;
+        uint32_t packet_seq = sock->window.last_ack_received;
 
         // No payload.
         uint8_t* payload = NULL;
@@ -194,26 +194,21 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
         // No extension.
         uint16_t ext_len = 0;
         uint8_t* ext_data = NULL;
-
         uint16_t src = sock->my_port;
         uint16_t dst = ntohs(sock->conn.sin_port);
-        uint32_t ack = sock->window.next_seq_expected;
         uint16_t hlen = sizeof(cmu_tcp_header_t);
         uint16_t plen = hlen + payload_len;
         uint8_t flags = ACK_FLAG_MASK;
         uint16_t adv_window = 1;
-        uint8_t* response_packet =
-            create_packet(src, dst, seq, ack, hlen, plen, flags, adv_window,
-                          ext_len, ext_data, payload, payload_len);
 
-        sendto(sock->socket, response_packet, plen, 0,
-               (struct sockaddr*)&(sock->conn), conn_len);
-        free(response_packet);
+        // ack = what have we heard so far?
+        uint32_t ack = sock->window.next_seq_expected;
 
-        seq = get_seq(hdr);
+        uint32_t seq = get_seq(hdr);
 
         if (seq == sock->window.next_seq_expected) {
           sock->window.next_seq_expected = seq + get_payload_len(pkt);
+          ack = get_payload_len(pkt) + get_seq(hdr);
           payload_len = get_payload_len(pkt);
           payload = get_payload(pkt);
 
@@ -223,6 +218,14 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
           memcpy(sock->received_buf + sock->received_len, payload, payload_len);
           sock->received_len += payload_len;
         }
+
+        uint8_t* response_packet =
+            create_packet(src, dst, packet_seq, ack, hlen, plen, flags,
+                          adv_window, ext_len, ext_data, payload, payload_len);
+
+        sendto(sock->socket, response_packet, plen, 0,
+               (struct sockaddr*)&(sock->conn), conn_len);
+        free(response_packet);
       }
     }
   }
@@ -286,7 +289,7 @@ void check_for_data(cmu_socket_t* sock, cmu_read_mode_t flags) {
 }
 
 // Send data in packet. You are guaranteed that packet.len < MSS
-void send_packet(cmu_socket_t* sock, unacked_packet* packet){
+void send_packet(cmu_socket_t* sock, unacked_packet* packet) {
   uint8_t* msg;
   size_t conn_len = sizeof(sock->conn);
   int sockfd = sock->socket;
@@ -336,7 +339,7 @@ void break_into_packets(cmu_socket_t* sock, uint8_t* data, int buf_len) {
       uint16_t payload_len = MIN((uint32_t)buf_len, (uint32_t)MSS);
       uint8_t* payload = data_offset;
       make_add_packet(payload, payload_len, sock);
-      
+
       buf_len -= payload_len;
       data_offset += payload_len;
     }
@@ -371,12 +374,11 @@ void handshake(cmu_socket_t* sock) {
   }
 }
 
-double get_time_passed(struct timespec start, struct timespec end){
-  return (end.tv_sec - start.tv_sec)
-         + (end.tv_nsec - start.tv_nsec) / 1e9;
+double get_time_passed(struct timespec start, struct timespec end) {
+  return (end.tv_sec - start.tv_sec) + (end.tv_nsec - start.tv_nsec) / 1e9;
 }
 
-void make_add_packet(uint8_t* data, int buf_len, cmu_socket_t* sock){
+void make_add_packet(uint8_t* data, int buf_len, cmu_socket_t* sock) {
   unacked_packet* packet = malloc(sizeof(unacked_packet));
 
   // store data
@@ -389,18 +391,18 @@ void make_add_packet(uint8_t* data, int buf_len, cmu_socket_t* sock){
   add_to_buffer(sock, packet);
 }
 
-void add_to_buffer(cmu_socket_t* sock, unacked_packet* packet){
+void add_to_buffer(cmu_socket_t* sock, unacked_packet* packet) {
   unacked_buffer* unacked = &sock->unacked;
 
   // Resize if size = capacity. Only the live entries (start_idx onwards) are
   // copied, so the new array starts at index 0 again.
-  if (unacked->size + 1 > unacked->capacity){
+  if (unacked->size + 1 > unacked->capacity) {
     uint32_t new_capacity = unacked->capacity * 2;
     if (new_capacity < unacked->size + 1) {
       new_capacity = (unacked->size + 1) * 2;
     }
     unacked_packet** temp = malloc(sizeof(unacked_packet*) * new_capacity);
-    for (uint32_t i = 0; i < unacked->size; i++){
+    for (uint32_t i = 0; i < unacked->size; i++) {
       temp[i] = unacked->buffer[unacked->start_idx + i];
     }
     free(unacked->buffer);
@@ -411,7 +413,7 @@ void add_to_buffer(cmu_socket_t* sock, unacked_packet* packet){
   }
 
   // Add new packet
-  if (unacked->size == 0){
+  if (unacked->size == 0) {
     packet->start_byte = sock->window.last_ack_received;
   } else {
     uint32_t last_idx = unacked->start_idx + unacked->size - 1;
@@ -422,7 +424,7 @@ void add_to_buffer(cmu_socket_t* sock, unacked_packet* packet){
   unacked->size += 1;
 }
 
-void init_unacked_buffer(cmu_socket_t* sock){
+void init_unacked_buffer(cmu_socket_t* sock) {
   sock->unacked.last_sent = -1;
   sock->unacked.buffer = malloc(5 * sizeof(unacked_packet*));
   sock->unacked.capacity = 5;
@@ -431,14 +433,15 @@ void init_unacked_buffer(cmu_socket_t* sock){
   sock->window.len = 0;
 }
 
-bool timer_expired(cmu_socket_t* sock){
+bool timer_expired(cmu_socket_t* sock) {
   // Nothing in flight: the first packet hasn't been sent, so it has no timer.
   if (sock->unacked.size == 0 ||
       sock->unacked.last_sent < (int32_t)sock->unacked.start_idx) {
     return false;
   }
 
-  struct timespec start = sock->unacked.buffer[sock->unacked.start_idx]->send_time;
+  struct timespec start =
+      sock->unacked.buffer[sock->unacked.start_idx]->send_time;
   struct timespec end;
   clock_gettime(CLOCK_MONOTONIC, &end);
   double time_diff = get_time_passed(start, end);  // seconds
@@ -446,8 +449,8 @@ bool timer_expired(cmu_socket_t* sock){
   return time_diff * 1000.0 > DEFAULT_TIMEOUT;  // DEFAULT_TIMEOUT is in ms
 }
 
-void timer_logic(cmu_socket_t* sock){
-  if (timer_expired(sock)){
+void timer_logic(cmu_socket_t* sock) {
+  if (timer_expired(sock)) {
     // resend window
     sock->unacked.last_sent = (int32_t)sock->unacked.start_idx - 1;
     sock->window.len = 0;
@@ -456,23 +459,23 @@ void timer_logic(cmu_socket_t* sock){
 }
 
 // check unacked and send anything not yet send respecting window size
-void send_logic(cmu_socket_t* sock){
+void send_logic(cmu_socket_t* sock) {
   unacked_buffer* unacked = &sock->unacked;
 
-  if (unacked->size == 0){
-    return; // nothing to send!
+  if (unacked->size == 0) {
+    return;  // nothing to send!
   }
 
-  while(1){
+  while (1) {
     uint32_t send_idx = (uint32_t)(unacked->last_sent + 1);
     bool out_of_range = send_idx >= unacked->start_idx + unacked->size;
-    if (out_of_range){
+    if (out_of_range) {
       break;
     }
 
     uint32_t next_plen = unacked->buffer[send_idx]->len;
     bool fits_window = (sock->window.len + next_plen) <= CP1_WINDOW_SIZE;
-    if (!fits_window){
+    if (!fits_window) {
       break;
     }
 
@@ -483,13 +486,13 @@ void send_logic(cmu_socket_t* sock){
   }
 }
 
-void free_packet(unacked_packet* packet){
+void free_packet(unacked_packet* packet) {
   free(packet->data);
   free(packet);
 }
 
-void update_unacked(cmu_socket_t* sock){
-  while(sock->unacked.size > 0){
+void update_unacked(cmu_socket_t* sock) {
+  while (sock->unacked.size > 0) {
     // check off by one for window
     uint32_t start_idx = sock->unacked.start_idx;
     uint32_t first_packet_start = sock->unacked.buffer[start_idx]->start_byte;
@@ -498,7 +501,7 @@ void update_unacked(cmu_socket_t* sock){
     // delete first packet
     unacked_packet* packet = sock->unacked.buffer[start_idx];
     sock->window.len -= packet->len;
-    free_packet(packet); //CAUTION: don't access packet after this
+    free_packet(packet);  // CAUTION: don't access packet after this
     sock->unacked.buffer[start_idx] = NULL;
 
     sock->unacked.size -= 1;
@@ -518,6 +521,38 @@ void flush_unacked(cmu_socket_t* sock) {
     timer_logic(sock);
   }
 }
+
+/*void teardown(sock){
+  sock->fin_rcvd = false;
+
+  if (sock->type == TCP_INITIATOR) {
+    // Send initial FIN
+    sock->isn = rand();
+    sock->window.last_ack_received = sock->isn;
+    sock->max_byte_sent = sock->isn + 1;  // the SYN occupies isn
+    while (!sock->is_connected) {
+      send_flag_packet(SYN_FLAG_MASK, sock, 0, sock->isn);
+      check_for_data(sock, TIMEOUT);  // waits up to DEFAULT_TIMEOUT (3s)
+    }
+  } else {  // TCP_LISTENER
+    sock->isn = rand();
+    sock->max_byte_sent = sock->isn + 1;  // the SYN-ACK occupies isn
+    while (!sock->is_connected) {
+      if (sock->syn_rcvd) {
+        send_flag_packet(ACK_FLAG_MASK | SYN_FLAG_MASK, sock,
+                         sock->window.next_seq_expected, sock->isn);
+      }
+      check_for_data(
+          sock,
+          TIMEOUT);  // wait for a SYN; handle_message replies with SYN-ACK
+    }
+  }
+  // send FIN
+
+  // resend if no ACK
+
+  // wait 2 × MSL (Maximum Segment Lifetime) from confirmation
+}*/
 
 void* begin_backend(void* in) {
   cmu_socket_t* sock = (cmu_socket_t*)in;
@@ -541,6 +576,7 @@ void* begin_backend(void* in) {
     if (death && buf_len == 0) {
       pthread_mutex_unlock(&(sock->send_lock));
       flush_unacked(sock);
+      // teardown(sock);
       break;
     }
 

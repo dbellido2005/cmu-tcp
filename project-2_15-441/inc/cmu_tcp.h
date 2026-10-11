@@ -66,6 +66,7 @@ typedef enum {
  */
 typedef struct {
   int socket;
+  bool fin_rcvd;
   bool is_connected;
   bool syn_rcvd;
   uint32_t isn;
