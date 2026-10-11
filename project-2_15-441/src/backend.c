@@ -142,7 +142,7 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
     }
     case (SYN_FLAG_MASK | ACK_FLAG_MASK): {
       bool well_formed = (sock->type == TCP_INITIATOR) &&
-                         (sock->window.last_ack_received + 1 == get_ack(hdr)) &&
+                         (sock->isn + 1 == get_ack(hdr)) &&
                          (get_plen(hdr) == get_hlen(hdr));
       DEBUG_PRINT("SYN-ACK well_formed=%d (expected ack=%u)\n", well_formed,
                   sock->window.last_ack_received + 1);
@@ -197,7 +197,7 @@ void handle_message(cmu_socket_t* sock, uint8_t* pkt) {
 
         uint16_t src = sock->my_port;
         uint16_t dst = ntohs(sock->conn.sin_port);
-        uint32_t ack = get_seq(hdr) + get_payload_len(pkt);
+        uint32_t ack = sock->window.next_seq_expected;
         uint16_t hlen = sizeof(cmu_tcp_header_t);
         uint16_t plen = hlen + payload_len;
         uint8_t flags = ACK_FLAG_MASK;
