@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <time.h>
 
 #include "cmu_packet.h"
 #include "grading.h"
@@ -29,10 +30,28 @@
 #define EXIT_FAILURE 1
 
 typedef struct {
-  uint32_t next_seq_expected;
-  uint32_t last_ack_received;
+  uint32_t next_seq_expected; // what we expect from other
+  uint32_t last_ack_received; // window start
+  uint32_t len; // window size 
 } window_t;
 
+typedef struct {
+  uint32_t start_byte;  // absolute seq number of this packet's first byte
+  uint32_t len;
+  struct timespec send_time;
+  uint8_t* data;
+} unacked_packet;
+
+// All indices below are absolute positions in `buffer`. Slots before
+// `start_idx` are unused; `capacity` counts the slots from `start_idx` to the
+// end of the allocation.
+typedef struct {
+  unacked_packet** buffer;
+  uint32_t capacity;
+  uint32_t size;
+  int32_t last_sent;  // index of the last packet sent; start_idx - 1 if none
+  uint32_t start_idx;
+} unacked_buffer;
 /**
  * CMU-TCP socket types. (DO NOT CHANGE.)
  */
@@ -64,6 +83,8 @@ typedef struct {
   int dying;
   pthread_mutex_t death_lock;
   window_t window;
+  unacked_buffer unacked;
+  uint32_t max_byte_sent;  // seq number right after the last byte sent
 } cmu_socket_t;
 
 /*
