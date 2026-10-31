@@ -192,7 +192,7 @@ void update_state(cmu_socket_t* sock, bool is_dup) {
       fast_recovery(sock);
     }
     // thresold reached -> congestion avoidance
-    if (sock->cwnd >= sock->ssthresh) {
+    else if (sock->cwnd >= sock->ssthresh) {
       sock->state = 2;
     }
   }
