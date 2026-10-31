@@ -66,8 +66,14 @@ typedef enum {
  */
 typedef struct {
   int socket;
-  bool fin_rcvd; // has the other socket received our fin (=acked it back)
-  bool fin_other; // has the other socket sent a fin
+  bool fin_rcvd;    // has the other socket received our fin (=acked it back)
+  bool fin_other;   // has the other socket sent a fin
+  uint8_t state;    // slow start = 1, congestion avoidance = 2, fast recovery = 3
+  uint32_t cwnd;    // congestion window
+  uint32_t rwnd;    // received advertised window
+  uint32_t advertised_wnd;   // my advertised window
+  uint32_t ssthresh;
+  uint32_t dupACKcount;
   bool handshake_done;
   bool is_connected;
   bool syn_rcvd;
