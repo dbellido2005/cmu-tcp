@@ -675,7 +675,8 @@ void advertised_wnd_logic(cmu_socket_t* sock) {
   // Announce you can get data again
   uint32_t new_awdw = MAX_NETWORK_BUFFER - sock->received_len;
   if (sock->advertised_wnd < MSS && new_awdw >= MSS) {
-    send_flag_packet(0, sock, 0, 0);  // ack & seq not used
+    send_flag_packet(0, sock, sock->window.next_seq_expected,
+                     0);  // ack & seq not used
   }
 
   // update advertised window
@@ -698,7 +699,7 @@ void* begin_backend(void* in) {
   sock->cwnd = WINDOW_INITIAL_WINDOW_SIZE;
   sock->ssthresh = WINDOW_INITIAL_SSTHRESH;
   sock->dupACKcount = 0;
-  sock->rwnd = 1;
+  sock->rwnd = MSS;
   init_unacked_buffer(sock);
 
   handshake(sock);
@@ -740,7 +741,6 @@ void* begin_backend(void* in) {
 
     // send anything in our unacked buffer that fits the window
     send_logic(sock);
-
     check_for_data(sock, NO_WAIT);
 
     while (pthread_mutex_lock(&(sock->recv_lock)) != 0) {
