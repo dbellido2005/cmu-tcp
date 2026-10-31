@@ -202,7 +202,7 @@ void update_state(cmu_socket_t* sock, bool is_dup) {
     if (is_dup) {
       sock->dupACKcount += 1;
     } else {
-      sock->cwnd += MSS * (MSS / sock->cwnd);
+      sock->cwnd += (MSS * MSS) / sock->cwnd;
       sock->dupACKcount = 0;
     }
     // triple duplicates -> fast recovery
