@@ -97,6 +97,7 @@ void send_flag_packet(uint8_t flags, cmu_socket_t* sock, uint32_t ack,
   uint16_t hlen = sizeof(cmu_tcp_header_t);
   uint16_t plen = hlen + payload_len;
   uint16_t adv_window = MAX_NETWORK_BUFFER - sock->received_len;
+  sock->advertised_wnd = adv_window;
   uint8_t* response_packet =
       create_packet(src, dst, seq, ack, hlen, plen, flags, adv_window, ext_len,
                     ext_data, payload, payload_len);
@@ -147,6 +148,7 @@ void send_payload_ack(cmu_socket_t* sock, uint8_t* pkt, bool is_fin) {
     }
 
     uint16_t adv_window = MAX_NETWORK_BUFFER - sock->received_len;
+    sock->advertised_wnd = adv_window;
     if (is_fin) ack += 1;
 
     uint8_t* response_packet =
@@ -421,6 +423,7 @@ void send_packet(cmu_socket_t* sock, unacked_packet* packet) {
     uint16_t plen = hlen + payload_len;
     uint8_t flags = ACK_FLAG_MASK;
     uint16_t adv_window = MAX_NETWORK_BUFFER - sock->received_len;
+    sock->advertised_wnd = adv_window;
     uint16_t ext_len = 0;
     uint8_t* ext_data = NULL;
     uint8_t* payload = packet->data;
@@ -678,9 +681,6 @@ void advertised_wnd_logic(cmu_socket_t* sock) {
     send_flag_packet(0, sock, sock->window.next_seq_expected,
                      0);  // ack & seq not used
   }
-
-  // update advertised window
-  sock->advertised_wnd = new_awdw;
 }
 
 void* begin_backend(void* in) {
