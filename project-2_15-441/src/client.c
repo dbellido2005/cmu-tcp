@@ -18,10 +18,10 @@
 
 #include "cmu_tcp.h"
 
-void functionality(cmu_socket_t *sock) {
+void functionality(cmu_socket_t* sock) {
   uint8_t buf[9898];
   int read;
-  FILE *fp;
+  FILE* fp;
 
   cmu_write(sock, "hi there", 8);
   cmu_write(sock, " https://www.youtube.com/watch?v=dQw4w9WgXcQ", 44);
@@ -38,7 +38,12 @@ void functionality(cmu_socket_t *sock) {
   read = cmu_read(sock, buf, 200, NO_WAIT);
   printf("Read: %d\n", read);
 
-  fp = fopen("/vagrant/project-2_15-441/src/cmu_tcp.c", "rb");
+  char* send_file = getenv("SEND_FILE");
+  fp = fopen(send_file ? send_file : "/vagrant/project-2_15-441/big.bin", "rb");
+  if (fp == NULL) {
+    perror("ERROR opening file to send");
+    return;
+  }
   read = 1;
   while (read > 0) {
     read = fread(buf, 1, 2000, fp);
@@ -50,8 +55,8 @@ void functionality(cmu_socket_t *sock) {
 
 int main() {
   int portno;
-  char *serverip;
-  char *serverport;
+  char* serverip;
+  char* serverport;
   cmu_socket_t socket;
 
   serverip = getenv("server15441");

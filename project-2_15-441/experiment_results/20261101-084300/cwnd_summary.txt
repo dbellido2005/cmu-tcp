@@ -1,0 +1,6 @@
+trace: cwnd_trace.csv  duration 7.23 s
+3-dup-ACK events: 22   timeouts: 1
+  time in Slow start               0.44 s
+  time in Congestion avoidance     2.95 s
+  time in Fast recovery            3.84 s
+plot saved to cwnd_plot.png

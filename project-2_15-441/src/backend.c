@@ -60,6 +60,34 @@ static FILE* debug_log_file(void) {
     }                                                   \
   } while (0)
 
+// Congestion-window trace for the report. Disabled unless the CWND_LOG
+// environment variable names a file; each call appends one CSV row:
+//   time_s,event,state,cwnd,ssthresh
+// event is one of: init, ack, dup, 3dupack, timeout.
+void log_cwnd(cmu_socket_t* sock, const char* event) {
+  static FILE* f = NULL;
+  static bool tried = false;
+  static struct timespec t0;
+  if (!tried) {
+    tried = true;
+    const char* path = getenv("CWND_LOG");
+    if (path != NULL) {
+      f = fopen(path, "w");
+      if (f != NULL) {
+        setvbuf(f, NULL, _IOLBF, 0);
+        fprintf(f, "time_s,event,state,cwnd,ssthresh\n");
+        clock_gettime(CLOCK_MONOTONIC, &t0);
+      }
+    }
+  }
+  if (f == NULL) return;
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  double t = (now.tv_sec - t0.tv_sec) + (now.tv_nsec - t0.tv_nsec) / 1e9;
+  fprintf(f, "%.6f,%s,%d,%u,%u\n", t, event, sock->state, sock->cwnd,
+          sock->ssthresh);
+}
+
 // function definitions
 void make_add_packet(uint8_t* data, int buf_len, cmu_socket_t* sock);
 void add_to_buffer(cmu_socket_t* sock, unacked_packet* packet);
@@ -166,18 +194,21 @@ void slow_start(cmu_socket_t* sock) {
   sock->ssthresh = sock->cwnd / 2;
   sock->cwnd = MSS;
   sock->dupACKcount = 0;
+  log_cwnd(sock, "timeout");
   send_n_last(sock);
 }
 
 void fast_recovery(cmu_socket_t* sock) {
   sock->state = 3;
   sock->dupACKcount = 0;
-  sock->ssthresh = sock->ssthresh / 2;
+  sock->ssthresh = sock->cwnd / 2;
   sock->cwnd = sock->ssthresh + 3 * MSS;
+  log_cwnd(sock, "3dupack");
   send_n_last(sock);
 }
 
 void update_state(cmu_socket_t* sock, bool is_dup) {
+  uint8_t prev_state = sock->state;
   // Slow start
   if (sock->state == 1) {
     // check duplicates
@@ -220,6 +251,10 @@ void update_state(cmu_socket_t* sock, bool is_dup) {
       sock->cwnd = sock->ssthresh;
       sock->dupACKcount = 0;
     }
+  }
+  // fast_recovery() already logged the 3-dup-ACK transition itself
+  if (!(sock->state == 3 && prev_state != 3)) {
+    log_cwnd(sock, is_dup ? "dup" : "ack");
   }
 }
 
@@ -701,6 +736,7 @@ void* begin_backend(void* in) {
   sock->dupACKcount = 0;
   sock->rwnd = MSS;
   init_unacked_buffer(sock);
+  log_cwnd(sock, "init");
 
   handshake(sock);
 

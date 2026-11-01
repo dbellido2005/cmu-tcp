@@ -15,6 +15,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "cmu_tcp.h"
@@ -33,21 +34,46 @@ void functionality(cmu_socket_t *sock) {
   FILE *fp;
   int n;
 
-  n = cmu_read(sock, buf, BUF_SIZE, NO_FLAG);
-  printf("R: %s\n", buf);
-  printf("N: %d\n", n);
+  // The client's greeting is exactly 229 bytes, then 9 bytes after our reply.
+  // Read exactly those amounts so no file bytes are consumed here.
+  int got = 0;
+  while (got < 229) {
+    n = cmu_read(sock, buf, 229 - got, NO_FLAG);
+    if (n <= 0) return;
+    got += n;
+  }
+  printf("Greeting 1: %d bytes\n", got);
   cmu_write(sock, "hi there", 9);
-  n = cmu_read(sock, buf, 200, NO_FLAG);
-  printf("R: %s\n", buf);
-  printf("N: %d\n", n);
+  got = 0;
+  while (got < 9) {
+    n = cmu_read(sock, buf, 9 - got, NO_FLAG);
+    if (n <= 0) return;
+    got += n;
+  }
+  printf("Greeting 2: %d bytes\n", got);
   cmu_write(sock, "https://www.youtube.com/watch?v=dQw4w9WgXcQ", 44);
 
-  sleep(1);
-  n = cmu_read(sock, buf, BUF_SIZE, NO_FLAG);
-  printf("N: %d\n", n);
+  // Read until the whole file has arrived, timing the file transfer only
+  // (excludes the handshake, greeting exchange, and teardown).
+  char *env_bytes = getenv("FILE_BYTES");
+  int expected = env_bytes ? atoi(env_bytes) : 1048576;
+  int total = 0;
+  struct timespec t_start, t_end;
   fp = fopen("/tmp/file.c", "w");
-  fwrite(buf, 1, n, fp);
+  clock_gettime(CLOCK_MONOTONIC, &t_start);
+  while (total < expected) {
+    n = cmu_read(sock, buf, BUF_SIZE, NO_FLAG);
+    if (n <= 0) break;
+    fwrite(buf, 1, n, fp);
+    total += n;
+  }
+  clock_gettime(CLOCK_MONOTONIC, &t_end);
   fclose(fp);
+  double secs = (t_end.tv_sec - t_start.tv_sec) +
+                (t_end.tv_nsec - t_start.tv_nsec) / 1e9;
+  printf("Received %d of %d bytes\n", total, expected);
+  printf("RESULT bytes=%d seconds=%.6f\n", total, secs);
+  fflush(stdout);
 }
 
 int main() {
