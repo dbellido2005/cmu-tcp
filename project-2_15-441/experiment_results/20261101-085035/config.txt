@@ -1,0 +1,21 @@
+Collected: Sun Nov  1 09:10:56 EST 2026
+Sender (client container):   tcset $IFNAME --rate 5Mbps --delay 20ms --loss <p> --overwrite
+Receiver (server container): tcset $IFNAME --rate 5Mbps --delay 20ms --overwrite
+RTT: 40 ms (20 ms each way); loss only on the sender's egress (data path)
+cwnd trace: loss 2%, file 2048k.bin
+Mathis file sizes: 0.1%,0.2% -> 8 MiB; 0.5% -> 4 MiB; 1% -> 2 MiB; 2% -> 1 MiB; 5% -> 512 KiB; 10% -> 256 KiB
+Throughput timing: receiver, file phase only (excludes handshake/greeting/teardown)
+Note: tcconfig's 5 Mbit htb class has a ~625 KB burst, so short transfers can exceed 5 Mbps
+
+grading.h:
+#define PROJECT_2_15_441_INC_GRADING_H_
+#define MAX_LEN 1400
+#define CP1_WINDOW_SIZE (MSS * 32)
+#define WINDOW_INITIAL_WINDOW_SIZE MSS
+#define WINDOW_INITIAL_SSTHRESH (MSS * 64)
+#define DEFAULT_TIMEOUT 3000  // ms
+#define MAX_NETWORK_BUFFER 65535  // (2^16 - 1) bytes
+
+tc (client):
+class htb 16f1:1 root prio 0 rate 10Gbit ceil 10Gbit burst 1680b cburst 1680b 
+class htb 16f1:2 root leaf 28d5: prio 0 rate 5Mbit ceil 5Mbit burst 625Kb cburst 625Kb 

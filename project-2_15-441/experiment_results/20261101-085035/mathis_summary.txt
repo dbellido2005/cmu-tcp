@@ -1,0 +1,16 @@
+
+Per-loss summary (Mbps):
+      p  1/sqrt(p)   n     mean      std
+   0.1%      31.62  10    4.841    0.073
+   0.2%      22.36  10    4.675    0.078
+   0.5%      14.14  10    4.324    0.411
+   1.0%      10.00  10    3.715    0.910
+   2.0%       7.07  10    2.042    0.767
+   5.0%       4.47  10    0.799    0.585
+  10.0%       3.16  10    0.134    0.081
+
+Regression (with intercept): throughput = 0.1574 * (1/sqrt(p)) + 0.8462   [Mbps]
+Regression (through origin): throughput = 0.1991 * (1/sqrt(p))          [Mbps]
+Pearson r between 1/sqrt(p) and throughput: 0.8155  (r^2 = 0.6651)
+
+Plot saved to mathis_plot.png
